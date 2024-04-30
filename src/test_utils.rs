@@ -163,6 +163,7 @@ pub mod tests {
             "main",
             crate::OptimizationLevel::None,
             debug_level,
+            crate::OnlineChange::Disabled,
         );
         let annotations = AstAnnotations::new(annotations, id_provider.next_id());
         let llvm_index = code_generator
@@ -234,6 +235,7 @@ pub mod tests {
                     &unit.file_name,
                     crate::OptimizationLevel::None,
                     debug_level,
+                    crate::OnlineChange::Disabled,
                 );
                 let llvm_index = code_generator.generate_llvm_index(
                     context,
