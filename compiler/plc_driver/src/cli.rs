@@ -5,7 +5,8 @@ use encoding_rs::Encoding;
 use plc_diagnostics::diagnostics::{diagnostics_registry::DiagnosticsConfiguration, Diagnostic};
 use std::{env, ffi::OsStr, num::ParseIntError, path::PathBuf};
 
-use plc::{output::FormatOption, ConfigFormat, DebugLevel, ErrorFormat, Target, Threads};
+use plc::output::FormatOption;
+use plc::{ConfigFormat, DebugLevel, ErrorFormat, Target, Threads, DEFAULT_GOT_LAYOUT_FILE};
 
 pub type ParameterError = clap::Error;
 
@@ -108,9 +109,11 @@ pub struct CompileParameters {
     Save information about the generated custom GOT layout to the given file.
     Format is detected by extension.
     Supported formats : json, toml",
-    parse(try_from_str = validate_config)
+        default_value = DEFAULT_GOT_LAYOUT_FILE,
+        parse(try_from_str = validate_config),
+        requires = "online-change"
     ) ]
-    pub got_layout_file: Option<String>,
+    pub got_layout_file: String,
 
     #[clap(
         name = "optimization",
@@ -204,6 +207,12 @@ pub struct CompileParameters {
 
     #[clap(name = "check", long, help = "Check only, do not generate any output", global = true)]
     pub check_only: bool,
+
+    #[clap(
+        long,
+        help = "Emit a binary with specific compilation information, suitable for online changes when ran under a conforming runtime"
+    )]
+    pub online_change: bool,
 
     #[clap(subcommand)]
     pub commands: Option<SubCommands>,
@@ -391,8 +400,9 @@ impl CompileParameters {
         self.hardware_config.as_deref().and_then(get_config_format)
     }
 
-    pub fn got_layout_format(&self) -> Option<ConfigFormat> {
-        self.got_layout_file.as_deref().and_then(get_config_format)
+    pub fn got_layout_format(&self) -> ConfigFormat {
+        // It is safe to unwrap here, since the provided argument to `--got-online-change` has been checked with `validate_config`
+        get_config_format(&self.got_layout_file).unwrap()
     }
 
     /// Returns the location where the build artifacts should be stored / output

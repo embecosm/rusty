@@ -19,8 +19,8 @@ use std::{
 use cli::{CompileParameters, ParameterError, SubCommands};
 use pipelines::AnnotatedProject;
 use plc::{
-    codegen::CodegenContext, linker::LinkerType, output::FormatOption, ConfigFormat, DebugLevel,
-    ErrorFormat, OptimizationLevel, Target, Threads,
+    codegen::CodegenContext, linker::LinkerType, output::FormatOption, ConfigFormat, DebugLevel, ErrorFormat,
+    OnlineChange, OptimizationLevel, Target, Threads, DEFAULT_GOT_LAYOUT_FILE,
 };
 
 use plc_diagnostics::{diagnostician::Diagnostician, diagnostics::Diagnostic};
@@ -50,12 +50,13 @@ pub struct CompileOptions {
     /// The name of the resulting compiled file
     pub output: String,
     pub output_format: FormatOption,
-    pub got_layout_file: Option<String>,
-    pub got_layout_format: Option<ConfigFormat>,
+    pub got_layout_file: String,
+    pub got_layout_format: ConfigFormat,
     pub optimization: OptimizationLevel,
     pub error_format: ErrorFormat,
     pub debug_level: DebugLevel,
     pub single_module: bool,
+    pub online_change: OnlineChange,
 }
 
 impl Default for CompileOptions {
@@ -65,12 +66,13 @@ impl Default for CompileOptions {
             build_location: None,
             output: String::new(),
             output_format: Default::default(),
-            got_layout_file: None,
-            got_layout_format: None,
+            got_layout_file: String::from(DEFAULT_GOT_LAYOUT_FILE),
+            got_layout_format: ConfigFormat::JSON,
             optimization: OptimizationLevel::None,
             error_format: ErrorFormat::None,
             debug_level: DebugLevel::None,
             single_module: false,
+            online_change: OnlineChange::Disabled,
         }
     }
 }
@@ -182,6 +184,11 @@ pub fn get_compilation_context<T: AsRef<str> + AsRef<OsStr> + Debug>(
         error_format: compile_parameters.error_format,
         debug_level: compile_parameters.debug_level(),
         single_module: compile_parameters.single_module,
+        online_change: if compile_parameters.online_change {
+            OnlineChange::Enabled
+        } else {
+            OnlineChange::Disabled
+        },
     };
 
     let libraries =

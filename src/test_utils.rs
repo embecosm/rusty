@@ -161,8 +161,10 @@ pub mod tests {
             &context,
             path.as_deref(),
             "main",
+            None,
             crate::OptimizationLevel::None,
             debug_level,
+            crate::OnlineChange::Disabled,
         );
         let annotations = AstAnnotations::new(annotations, id_provider.next_id());
         let llvm_index = code_generator
@@ -232,8 +234,10 @@ pub mod tests {
                     context,
                     path.as_deref(),
                     &unit.file_name,
+                    None,
                     crate::OptimizationLevel::None,
                     debug_level,
+                    crate::OnlineChange::Disabled,
                 );
                 let llvm_index = code_generator.generate_llvm_index(
                     context,

@@ -5,7 +5,7 @@ use crate::{
     codegen::{debug::Debug, llvm_index::LlvmTypedIndex, llvm_typesystem::cast_if_needed},
     index::{get_initializer_name, Index, PouIndexEntry, VariableIndexEntry},
     resolver::{AnnotationMap, AstAnnotations, Dependency},
-    ConfigFormat,
+    ConfigFormat, OnlineChange,
 };
 use indexmap::IndexSet;
 use inkwell::{module::Module, types::BasicTypeEnum, values::GlobalValue};
@@ -65,7 +65,8 @@ pub struct VariableGenerator<'ctx, 'b> {
     annotations: &'b AstAnnotations,
     types_index: &'b LlvmTypedIndex<'ctx>,
     debug: &'b mut DebugBuilderEnum<'ctx>,
-    got_layout_file: Option<(String, ConfigFormat)>,
+    got_layout_file: (String, ConfigFormat),
+    online_change: OnlineChange,
 }
 
 impl<'ctx, 'b> VariableGenerator<'ctx, 'b> {
@@ -76,9 +77,19 @@ impl<'ctx, 'b> VariableGenerator<'ctx, 'b> {
         annotations: &'b AstAnnotations,
         types_index: &'b LlvmTypedIndex<'ctx>,
         debug: &'b mut DebugBuilderEnum<'ctx>,
-        got_layout_file: Option<(String, ConfigFormat)>,
+        got_layout_file: (String, ConfigFormat),
+        online_change: OnlineChange,
     ) -> Self {
-        VariableGenerator { module, llvm, global_index, annotations, types_index, debug, got_layout_file }
+        VariableGenerator {
+            module,
+            llvm,
+            global_index,
+            annotations,
+            types_index,
+            debug,
+            got_layout_file,
+            online_change,
+        }
     }
 
     pub fn generate_global_variables(
@@ -140,7 +151,9 @@ impl<'ctx, 'b> VariableGenerator<'ctx, 'b> {
             );
         }
 
-        if let Some((location, format)) = &self.got_layout_file {
+        if self.online_change == OnlineChange::Enabled {
+            let (location, format) = &self.got_layout_file;
+
             let got_entries = read_got_layout(location.as_str(), *format)?;
             let mut new_globals = Vec::new();
             let mut new_got_entries = HashMap::new();
