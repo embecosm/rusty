@@ -73,7 +73,7 @@ pub struct CodeGen<'ink> {
     /// Whether we are generating a hot-reloadable binary or not
     pub online_change: OnlineChange,
 
-    pub got_layout_file: Option<(String, ConfigFormat)>,
+    pub got_layout_file: (String, ConfigFormat),
 
     pub module_location: String,
 }
@@ -92,7 +92,7 @@ impl<'ink> CodeGen<'ink> {
         context: &'ink CodegenContext,
         root: Option<&Path>,
         module_location: &str,
-        got_layout_file: Option<(String, ConfigFormat)>,
+        got_layout_file: (String, ConfigFormat),
         optimization_level: OptimizationLevel,
         debug_level: DebugLevel,
         online_change: OnlineChange,
@@ -137,6 +137,7 @@ impl<'ink> CodeGen<'ink> {
             &index,
             &mut self.debug,
             self.got_layout_file.clone(),
+            self.online_change,
         );
 
         //Generate global variables
