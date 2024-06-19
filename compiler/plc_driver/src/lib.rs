@@ -19,8 +19,8 @@ use std::{
 use cli::{CompileParameters, ParameterError, SubCommands};
 use pipelines::AnnotatedProject;
 use plc::{
-    codegen::CodegenContext, linker::LinkerType, output::FormatOption, ConfigFormat, DebugLevel,
-    ErrorFormat, OptimizationLevel, Target, Threads,
+    codegen::CodegenContext, linker::LinkerType, output::FormatOption, ConfigFormat, DebugLevel, ErrorFormat,
+    OptimizationLevel, Target, Threads,
 };
 
 use plc_diagnostics::{diagnostician::Diagnostician, diagnostics::Diagnostic};
@@ -372,7 +372,7 @@ fn generate(
     };
     let project = annotated_project.get_project();
     let output_name = project.get_output_name();
-    res.into_par_iter()
+    res.into_iter()
         .map(|res| {
             res.link(
                 project.get_objects(),

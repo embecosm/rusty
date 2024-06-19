@@ -332,6 +332,7 @@ impl<T: SourceContainer + Sync> AnnotatedProject<T> {
         });
         ensure_compile_dirs(targets, &compile_directory)?;
         let targets = if targets.is_empty() { &[Target::System] } else { targets };
+
         let res = targets
             .par_iter()
             .map(|target| {
@@ -363,6 +364,8 @@ impl<T: SourceContainer + Sync> AnnotatedProject<T> {
                             FormatOption::Bitcode => format!("{}.bc", output_name.to_string_lossy()),
                             _ => format!("{}.o", output_name.to_string_lossy()),
                         };
+
+                        dbg!(&output_name);
 
                         let context = CodegenContext::create(); //Create a build location for the generated object files
                         let module =
@@ -419,6 +422,8 @@ fn ensure_compile_dirs(targets: &[Target], compile_directory: &Path) -> Result<(
 pub struct GeneratedProject {
     target: Target,
     objects: Vec<Object>,
+    // Layout of the custom Global Offset Table for online-change
+    got_layout: HashMap<String, u64>,
 }
 
 impl GeneratedProject {

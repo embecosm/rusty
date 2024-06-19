@@ -34,8 +34,10 @@ pub fn read_got_layout(location: &str, format: ConfigFormat) -> Result<HashMap<S
     let s =
         read_to_string(location).map_err(|_| Diagnostic::new("GOT layout could not be read from file"))?;
     match format {
-        ConfigFormat::JSON => serde_json::from_str(&s)
-            .map_err(|_| Diagnostic::new("Could not deserialize GOT layout from JSON")),
+        ConfigFormat::JSON => serde_json::from_str(&s).map_err(|e| {
+            dbg!(e);
+            Diagnostic::new("Could not deserialize GOT layout from JSON")
+        }),
         ConfigFormat::TOML => {
             toml::de::from_str(&s).map_err(|_| Diagnostic::new("Could not deserialize GOT layout from TOML"))
         }
@@ -65,7 +67,7 @@ pub struct VariableGenerator<'ctx, 'b> {
     annotations: &'b AstAnnotations,
     types_index: &'b LlvmTypedIndex<'ctx>,
     debug: &'b mut DebugBuilderEnum<'ctx>,
-    got_layout_file: Option<(String, ConfigFormat)>,
+    got_layout: Option<&HashMap<String, u64>>,
 }
 
 impl<'ctx, 'b> VariableGenerator<'ctx, 'b> {
@@ -76,9 +78,9 @@ impl<'ctx, 'b> VariableGenerator<'ctx, 'b> {
         annotations: &'b AstAnnotations,
         types_index: &'b LlvmTypedIndex<'ctx>,
         debug: &'b mut DebugBuilderEnum<'ctx>,
-        got_layout_file: Option<(String, ConfigFormat)>,
+        got_layout: Option<&HashMap<String, u64>>,
     ) -> Self {
-        VariableGenerator { module, llvm, global_index, annotations, types_index, debug, got_layout_file }
+        VariableGenerator { module, llvm, global_index, annotations, types_index, debug, got_layout }
     }
 
     pub fn generate_global_variables(
@@ -140,8 +142,7 @@ impl<'ctx, 'b> VariableGenerator<'ctx, 'b> {
             );
         }
 
-        if let Some((location, format)) = &self.got_layout_file {
-            let got_entries = read_got_layout(location.as_str(), *format)?;
+        if let Some(got_entries) = &self.got_layout {
             let mut new_globals = Vec::new();
             let mut new_got_entries = HashMap::new();
             let mut new_got = HashMap::new();
@@ -166,9 +167,13 @@ impl<'ctx, 'b> VariableGenerator<'ctx, 'b> {
             }
 
             // Now we can write new_got_entries back out to a file.
-            write_got_layout(new_got_entries, location.as_str(), *format)?;
+            // write_got_layout(new_got_entries, location.as_str(), *format)?;
+
+            index.associate_got_layout(new_got_entries);
 
             // Construct our GOT as a new global array. We initialise this array in the loader code.
+            // FIXME: Is it okay to do this when we compile multiple object files at once but only want one resulting customGOT global variable?
+            // FIXME: Where should we do that otherwise?
             let got_size = new_got.keys().max().map_or(0, |m| *m + 1);
             let _got = self.llvm.create_global_variable(
                 self.module,

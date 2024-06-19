@@ -20,6 +20,7 @@ pub struct LlvmTypedIndex<'ink> {
     constants: FxHashMap<String, BasicValueEnum<'ink>>,
     utf08_literals: FxHashMap<String, GlobalValue<'ink>>,
     utf16_literals: FxHashMap<String, GlobalValue<'ink>>,
+    got_layout: HashMap<String, u64>,
 }
 
 impl<'ink> LlvmTypedIndex<'ink> {
@@ -35,6 +36,7 @@ impl<'ink> LlvmTypedIndex<'ink> {
             constants: FxHashMap::default(),
             utf08_literals: FxHashMap::default(),
             utf16_literals: FxHashMap::default(),
+            got_layout: HashMap::new(),
         }
     }
 
@@ -63,6 +65,7 @@ impl<'ink> LlvmTypedIndex<'ink> {
         self.constants.extend(other.constants);
         self.utf08_literals.extend(other.utf08_literals);
         self.utf16_literals.extend(other.utf16_literals);
+        self.got_layout.extend(other.got_layout);
     }
 
     pub fn associate_type(
@@ -212,5 +215,10 @@ impl<'ink> LlvmTypedIndex<'ink> {
         self.utf16_literals
             .get(literal)
             .or_else(|| self.parent_index.and_then(|it| it.find_utf16_literal_string(literal)))
+    }
+
+    // FIXME: Does this need a better API? something like `index.associate_got_index(variable_name, got_index)`?
+    pub fn associate_got_layout(&mut self, got_layout: HashMap<String, u64>) {
+        self.got_layout = got_layout;
     }
 }
