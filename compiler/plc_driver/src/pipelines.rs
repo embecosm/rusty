@@ -4,6 +4,7 @@ use std::{
     fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 use crate::{CompileOptions, LinkOptions};
@@ -320,7 +321,7 @@ impl<T: SourceContainer + Sync> AnnotatedProject<T> {
         unit: &CompilationUnit,
         dependencies: &FxIndexSet<Dependency>,
         literals: &StringLiterals,
-        got_layout: Option<&HashMap<String, u64>>,
+        got_layout: &Mutex<Option<HashMap<String, u64>>>,
     ) -> Result<GeneratedModule<'ctx>, Diagnostic> {
         let mut code_generator = plc::codegen::CodeGen::new(
             context,
@@ -392,6 +393,8 @@ impl<T: SourceContainer + Sync> AnnotatedProject<T> {
             .map(|path| read_got_layout(&path, ConfigFormat::JSON))
             .transpose()?;
 
+        let got_layout = Mutex::new(got_layout);
+
         let res = targets
             .par_iter()
             .map(|target| {
@@ -431,7 +434,7 @@ impl<T: SourceContainer + Sync> AnnotatedProject<T> {
                             unit,
                             dependencies,
                             literals,
-                            got_layout.as_ref(),
+                            &got_layout,
                         )?;
                         module
                             .persist(
@@ -450,6 +453,10 @@ impl<T: SourceContainer + Sync> AnnotatedProject<T> {
                 Ok(GeneratedProject { target: target.clone(), objects })
             })
             .collect::<Result<Vec<_>, Diagnostic>>()?;
+
+        compile_options.got_layout_file.as_ref().map(|path| {
+            write_got_layout(got_layout.into_inner().unwrap().unwrap(), path, ConfigFormat::JSON)
+        });
 
         Ok(res)
     }

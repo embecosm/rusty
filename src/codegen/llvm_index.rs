@@ -73,7 +73,7 @@ impl<'ink> LlvmTypedIndex<'ink> {
         self.utf08_literals.extend(other.utf08_literals);
         self.utf16_literals.extend(other.utf16_literals);
 
-        todo!("merge two got layouts together")
+        todo!("merge two got layouts together: {:?}", other.got_layout);
     }
 
     pub fn associate_type(

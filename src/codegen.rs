@@ -5,6 +5,7 @@ use std::{
     fs,
     ops::Deref,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 /// module to generate llvm intermediate representation for a CompilationUnit
@@ -111,7 +112,7 @@ impl<'ink> CodeGen<'ink> {
         literals: &StringLiterals,
         dependencies: &FxIndexSet<Dependency>,
         global_index: &Index,
-        got_layout: Option<&HashMap<String, u64>>,
+        got_layout: &Mutex<Option<HashMap<String, u64>>>,
     ) -> Result<LlvmTypedIndex<'ink>, Diagnostic> {
         let llvm = Llvm::new(context, context.create_builder());
         let mut index = LlvmTypedIndex::default();
@@ -159,7 +160,7 @@ impl<'ink> CodeGen<'ink> {
         let all_names: Vec<_> = all_names.collect();
         dbg!(all_names.len());
 
-        if let Some(got_entries) = got_layout {
+        if let Some(got_entries) = &mut *got_layout.lock().unwrap() {
             // let got_entries = read_got_layout(location.as_str(), *format)?;
             let mut new_symbols = Vec::new();
             let mut new_got_entries = HashMap::new();
@@ -200,6 +201,8 @@ impl<'ink> CodeGen<'ink> {
                     got_size.try_into().expect("the computed custom GOT size is too large"),
                 )),
             );
+
+            *got_entries = new_got_entries;
         }
 
         //Generate opaque functions for implementations and associate them with their types
