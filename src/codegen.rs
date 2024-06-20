@@ -81,45 +81,12 @@ pub struct CodeGen<'ink> {
 
 pub struct GeneratedModule<'ink> {
     module: Module<'ink>,
+    got_layout: Option<HashMap<String, u64>>,
     engine: RefCell<Option<ExecutionEngine<'ink>>>,
 }
 
 type MainFunction<T, U> = unsafe extern "C" fn(*mut T) -> U;
 type MainEmptyFunction<U> = unsafe extern "C" fn() -> U;
-
-pub fn read_got_layout(location: &str, format: ConfigFormat) -> Result<HashMap<String, u64>, Diagnostic> {
-    if !Path::new(location).is_file() {
-        // Assume if the file doesn't exist that there is no existing GOT layout yet. write_got_layout will handle
-        // creating our file when we want to.
-        return Ok(HashMap::new());
-    }
-
-    let s =
-        fs::read_to_string(location).map_err(|_| Diagnostic::new("GOT layout could not be read from file"))?;
-    match format {
-        ConfigFormat::JSON => serde_json::from_str(&s)
-            .map_err(|_| Diagnostic::new("Could not deserialize GOT layout from JSON")),
-        ConfigFormat::TOML => {
-            toml::de::from_str(&s).map_err(|_| Diagnostic::new("Could not deserialize GOT layout from TOML"))
-        }
-    }
-}
-
-pub fn write_got_layout(
-    got_entries: HashMap<String, u64>,
-    location: &str,
-    format: ConfigFormat,
-) -> Result<(), Diagnostic> {
-    let s = match format {
-        ConfigFormat::JSON => serde_json::to_string(&got_entries)
-            .map_err(|_| Diagnostic::new("Could not serialize GOT layout to JSON"))?,
-        ConfigFormat::TOML => toml::ser::to_string(&got_entries)
-            .map_err(|_| Diagnostic::new("Could not serialize GOT layout to TOML"))?,
-    };
-
-    fs::write(location, s).map_err(|_| Diagnostic::new("GOT layout could not be written to file"))?;
-    Ok(())
-}
 
 impl<'ink> CodeGen<'ink> {
     /// constructs a new code-generator that generates CompilationUnits into a module with the given module_name
@@ -144,6 +111,7 @@ impl<'ink> CodeGen<'ink> {
         literals: &StringLiterals,
         dependencies: &FxIndexSet<Dependency>,
         global_index: &Index,
+        got_layout: Option<&HashMap<String, u64>>,
     ) -> Result<LlvmTypedIndex<'ink>, Diagnostic> {
         let llvm = Llvm::new(context, context.create_builder());
         let mut index = LlvmTypedIndex::default();
@@ -157,14 +125,8 @@ impl<'ink> CodeGen<'ink> {
         )?;
         index.merge(llvm_type_index);
 
-        let mut variable_generator = VariableGenerator::new(
-            &self.module,
-            &llvm,
-            global_index,
-            annotations,
-            &index,
-            &mut self.debug,
-        );
+        let mut variable_generator =
+            VariableGenerator::new(&self.module, &llvm, global_index, annotations, &index, &mut self.debug);
 
         //Generate global variables
         let llvm_gv_index =
@@ -173,21 +135,20 @@ impl<'ink> CodeGen<'ink> {
 
         // Build our GOT layout here. We need to find all the names for globals, programs, and
         // functions and assign them indices in the GOT, taking into account prior indices.
-        let program_globals = global_index
-            .get_program_instances()
-            .into_iter()
-            .fold(Vec::new(), |mut acc, p| {
+        let program_globals =
+            global_index.get_program_instances().into_iter().fold(Vec::new(), |mut acc, p| {
                 acc.push(p.get_name());
                 acc.push(p.get_qualified_name());
                 acc
             });
-        let functions = global_index.get_pous().values()
-            .filter_map(|p| match p {
-                PouIndexEntry::Function { name, linkage: LinkageType::Internal, is_generated: false, .. }
-                | PouIndexEntry::FunctionBlock { name, linkage: LinkageType::Internal, .. } => Some(name.as_ref()),
-                _ => None,
-            });
-        let all_names =  global_index
+        let functions = global_index.get_pous().values().filter_map(|p| match p {
+            PouIndexEntry::Function { name, linkage: LinkageType::Internal, is_generated: false, .. }
+            | PouIndexEntry::FunctionBlock { name, linkage: LinkageType::Internal, .. } => {
+                Some(name.as_ref())
+            }
+            _ => None,
+        });
+        let all_names = global_index
             .get_globals()
             .values()
             .map(|g| g.get_qualified_name())
@@ -195,8 +156,11 @@ impl<'ink> CodeGen<'ink> {
             .chain(functions)
             .map(|n| n.to_lowercase());
 
-        if let Some((location, format)) = &self.got_layout_file {
-            let got_entries = read_got_layout(location.as_str(), *format)?;
+        let all_names: Vec<_> = all_names.collect();
+        dbg!(all_names.len());
+
+        if let Some(got_entries) = got_layout {
+            // let got_entries = read_got_layout(location.as_str(), *format)?;
             let mut new_symbols = Vec::new();
             let mut new_got_entries = HashMap::new();
             let mut new_got = HashMap::new();
@@ -222,8 +186,9 @@ impl<'ink> CodeGen<'ink> {
                 new_got.insert(idx, name.to_string());
             }
 
+            // FIXME: Remove - moved out of there
             // Now we can write new_got_entries back out to a file.
-            write_got_layout(new_got_entries, location.as_str(), *format)?;
+            // write_got_layout(new_got_entries, location.as_str(), *format)?;
 
             // Construct our GOT as a new global array. We initialise this array in the loader code.
             let got_size = new_got.keys().max().map_or(0, |m| *m + 1);
@@ -305,11 +270,11 @@ impl<'ink> CodeGen<'ink> {
         unit: &CompilationUnit,
         annotations: &AstAnnotations,
         global_index: &Index,
-        llvm_index: &LlvmTypedIndex,
+        llvm_index: LlvmTypedIndex,
     ) -> Result<GeneratedModule<'ink>, Diagnostic> {
         //generate all pous
         let llvm = Llvm::new(context, context.create_builder());
-        let pou_generator = PouGenerator::new(llvm, global_index, annotations, llvm_index);
+        let pou_generator = PouGenerator::new(llvm, global_index, annotations, &llvm_index);
 
         //Generate the POU stubs in the first go to make sure they can be referenced.
         for implementation in &unit.implementations {
@@ -333,7 +298,11 @@ impl<'ink> CodeGen<'ink> {
         }
 
         #[cfg(not(feature = "verify"))]
-        Ok(GeneratedModule { module: self.module, engine: RefCell::new(None) })
+        Ok(GeneratedModule {
+            module: self.module,
+            got_layout: llvm_index.got_layout,
+            engine: RefCell::new(None),
+        })
     }
 }
 
@@ -341,7 +310,7 @@ impl<'ink> GeneratedModule<'ink> {
     pub fn try_from_bitcode(context: &'ink CodegenContext, path: &Path) -> Result<Self, Diagnostic> {
         let module = Module::parse_bitcode_from_path(path, context.deref())
             .map_err(|it| Diagnostic::new(it.to_string_lossy()).with_error_code("E071"))?;
-        Ok(GeneratedModule { module, engine: RefCell::new(None) })
+        Ok(GeneratedModule { module, got_layout: None, engine: RefCell::new(None) })
     }
 
     pub fn try_from_ir(context: &'ink CodegenContext, path: &Path) -> Result<Self, Diagnostic> {
@@ -353,7 +322,7 @@ impl<'ink> GeneratedModule<'ink> {
 
         log::debug!("{}", module.to_string());
 
-        Ok(GeneratedModule { module, engine: RefCell::new(None) })
+        Ok(GeneratedModule { module, got_layout: None, engine: RefCell::new(None) })
     }
 
     pub fn merge(self, other: GeneratedModule<'ink>) -> Result<Self, Diagnostic> {

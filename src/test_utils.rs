@@ -241,6 +241,7 @@ pub mod tests {
                     &literals,
                     &dependencies,
                     &index,
+                    todo!(),
                 )?;
 
                 code_generator.generate(context, &unit, &annotations, &index, &llvm_index)

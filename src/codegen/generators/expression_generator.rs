@@ -19,8 +19,8 @@ use inkwell::{
     builder::Builder,
     types::{BasicType, BasicTypeEnum, FunctionType},
     values::{
-        ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallableValue,
-        CallSiteValue, FloatValue, IntValue, PointerValue, StructValue, VectorValue,
+        ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, CallSiteValue, CallableValue,
+        FloatValue, IntValue, PointerValue, StructValue, VectorValue,
     },
     AddressSpace, FloatPredicate, IntPredicate,
 };
@@ -293,14 +293,10 @@ impl<'ink, 'b> ExpressionCodeGenerator<'ink, 'b> {
             Some(StatementAnnotation::Variable { qualified_name, .. }) => {
                 // We will generate a GEP, which has as its base address the magic constant which
                 // will eventually be replaced by the location of the GOT.
-                let base = self
-                    .llvm
-                    .context
-                    .i64_type()
-                    .const_int(0xdeadbeef00000000, false)
-                    .const_to_pointer(llvm_type
-                        .ptr_type(AddressSpace::default())
-                        .ptr_type(AddressSpace::default()));
+                let base =
+                    self.llvm.context.i64_type().const_int(0xdeadbeef00000000, false).const_to_pointer(
+                        llvm_type.ptr_type(AddressSpace::default()).ptr_type(AddressSpace::default()),
+                    );
 
                 self.llvm_index
                     .find_got_index(qualified_name)
@@ -327,14 +323,9 @@ impl<'ink, 'b> ExpressionCodeGenerator<'ink, 'b> {
     ) -> Result<Option<CallSiteValue<'ink>>, Diagnostic> {
         // We will generate a GEP, which has as its base address the magic constant which
         // will eventually be replaced by the location of the GOT.
-        let base = self
-            .llvm
-            .context
-            .i64_type()
-            .const_int(0xdeadbeef00000000, false)
-            .const_to_pointer(llvm_type
-                .ptr_type(AddressSpace::default())
-                .ptr_type(AddressSpace::default()));
+        let base = self.llvm.context.i64_type().const_int(0xdeadbeef00000000, false).const_to_pointer(
+            function_type.ptr_type(AddressSpace::default()).ptr_type(AddressSpace::default()),
+        );
 
         self.llvm_index
             .find_got_index(qualified_name)
@@ -552,10 +543,13 @@ impl<'ink, 'b> ExpressionCodeGenerator<'ink, 'b> {
         // Check for the function within the GOT. If it's there, we need to generate an indirect
         // call to its location within the GOT, which should contain a function pointer.
         // First get the function type so our function pointer can have the correct type.
-        let qualified_name = self.annotations.get_qualified_name(operator)
+        let qualified_name = self
+            .annotations
+            .get_qualified_name(operator)
             .expect("Shouldn't have got this far without a name for the function");
         let function_type = function.get_type();
-        let call = self.generate_got_call(qualified_name, &function_type, &arguments_list)?
+        let call = self
+            .generate_got_call(qualified_name, &function_type, &arguments_list)?
             .unwrap_or_else(|| self.llvm.builder.build_call(function, &arguments_list, "call"));
 
         // if the target is a function, declare the struct locally
@@ -1297,17 +1291,19 @@ impl<'ink, 'b> ExpressionCodeGenerator<'ink, 'b> {
             }
         }
 
-        let ctx_type =
-            self.annotations.get_type_or_void(context, self.index).get_type_information();
+        let ctx_type = self.annotations.get_type_or_void(context, self.index).get_type_information();
 
         // no context ... so just something like 'x'
         match self.annotations.get(context) {
             Some(StatementAnnotation::Variable { qualified_name, .. })
-            | Some(StatementAnnotation::Program { qualified_name, .. }) =>
-                self.generate_got_access(context, &self.llvm_index.get_associated_type(ctx_type.get_name())?)?.map_or(self
-                    .llvm_index
-                    .find_loaded_associated_variable_value(qualified_name)
-                    .ok_or_else(|| Diagnostic::unresolved_reference(name, offset.clone())), Ok),
+            | Some(StatementAnnotation::Program { qualified_name, .. }) => self
+                .generate_got_access(context, &self.llvm_index.get_associated_type(ctx_type.get_name())?)?
+                .map_or(
+                    self.llvm_index
+                        .find_loaded_associated_variable_value(qualified_name)
+                        .ok_or_else(|| Diagnostic::unresolved_reference(name, offset.clone())),
+                    Ok,
+                ),
             _ => Err(Diagnostic::unresolved_reference(name, offset.clone())),
         }
     }

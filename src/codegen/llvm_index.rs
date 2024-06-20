@@ -5,6 +5,7 @@ use plc_diagnostics::diagnostics::Diagnostic;
 use plc_source::source_location::SourceLocation;
 use plc_util::convention::qualified_name;
 use rustc_hash::FxHashMap;
+use std::collections::HashMap;
 
 /// Index view containing declared values for the current context
 /// Parent Index is the a fallback lookup index for values not declared locally
@@ -21,6 +22,8 @@ pub struct LlvmTypedIndex<'ink> {
     constants: FxHashMap<String, BasicValueEnum<'ink>>,
     utf08_literals: FxHashMap<String, GlobalValue<'ink>>,
     utf16_literals: FxHashMap<String, GlobalValue<'ink>>,
+    // TODO: Okay to have that field public?
+    pub got_layout: Option<HashMap<String, u64>>,
 }
 
 impl<'ink> LlvmTypedIndex<'ink> {
@@ -37,6 +40,7 @@ impl<'ink> LlvmTypedIndex<'ink> {
             constants: FxHashMap::default(),
             utf08_literals: FxHashMap::default(),
             utf16_literals: FxHashMap::default(),
+            got_layout: todo!("create child with proper GOT layout: {:?}", parent.got_layout),
         }
     }
 
@@ -68,6 +72,8 @@ impl<'ink> LlvmTypedIndex<'ink> {
         self.constants.extend(other.constants);
         self.utf08_literals.extend(other.utf08_literals);
         self.utf16_literals.extend(other.utf16_literals);
+
+        todo!("merge two got layouts together")
     }
 
     pub fn associate_type(
@@ -165,11 +171,7 @@ impl<'ink> LlvmTypedIndex<'ink> {
         Ok(())
     }
 
-    pub fn associate_got_index(
-        &mut self,
-        variable_name: &str,
-        index: u64,
-    ) -> Result<(), Diagnostic> {
+    pub fn associate_got_index(&mut self, variable_name: &str, index: u64) -> Result<(), Diagnostic> {
         self.got_indices.insert(variable_name.to_lowercase(), index);
         Ok(())
     }
