@@ -21,7 +21,7 @@ fn parse_prefix(input: &str) -> ParseResult<Prefix> {
     let fn_prefix = tag("fn").map(|_| Prefix::Fn);
     let var_prefix = tag("var").map(|_| Prefix::Var);
 
-    let (input, _) = tag(crate::PREFIX)(input)?;
+    let (input, _) = tag(crate::RUSTY_PREFIX)(input)?;
     let (input, prefix) = alt((fn_prefix, var_prefix))(input)?;
 
     Ok((input, prefix))
