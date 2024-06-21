@@ -82,7 +82,6 @@ pub struct CodeGen<'ink> {
 
 pub struct GeneratedModule<'ink> {
     module: Module<'ink>,
-    got_layout: Option<HashMap<String, u64>>,
     engine: RefCell<Option<ExecutionEngine<'ink>>>,
 }
 
@@ -301,11 +300,7 @@ impl<'ink> CodeGen<'ink> {
         }
 
         #[cfg(not(feature = "verify"))]
-        Ok(GeneratedModule {
-            module: self.module,
-            got_layout: llvm_index.got_layout,
-            engine: RefCell::new(None),
-        })
+        Ok(GeneratedModule { module: self.module, engine: RefCell::new(None) })
     }
 }
 
@@ -313,7 +308,7 @@ impl<'ink> GeneratedModule<'ink> {
     pub fn try_from_bitcode(context: &'ink CodegenContext, path: &Path) -> Result<Self, Diagnostic> {
         let module = Module::parse_bitcode_from_path(path, context.deref())
             .map_err(|it| Diagnostic::new(it.to_string_lossy()).with_error_code("E071"))?;
-        Ok(GeneratedModule { module, got_layout: None, engine: RefCell::new(None) })
+        Ok(GeneratedModule { module, engine: RefCell::new(None) })
     }
 
     pub fn try_from_ir(context: &'ink CodegenContext, path: &Path) -> Result<Self, Diagnostic> {
@@ -325,7 +320,7 @@ impl<'ink> GeneratedModule<'ink> {
 
         log::debug!("{}", module.to_string());
 
-        Ok(GeneratedModule { module, got_layout: None, engine: RefCell::new(None) })
+        Ok(GeneratedModule { module, engine: RefCell::new(None) })
     }
 
     pub fn merge(self, other: GeneratedModule<'ink>) -> Result<Self, Diagnostic> {

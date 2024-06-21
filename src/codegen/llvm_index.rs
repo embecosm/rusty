@@ -15,6 +15,7 @@ pub struct LlvmTypedIndex<'ink> {
     type_associations: FxHashMap<String, BasicTypeEnum<'ink>>,
     pou_type_associations: FxHashMap<String, BasicTypeEnum<'ink>>,
     global_values: FxHashMap<String, GlobalValue<'ink>>,
+    // TODO: Should this be an Option?
     got_indices: FxHashMap<String, u64>,
     initial_value_associations: FxHashMap<String, BasicValueEnum<'ink>>,
     loaded_variable_associations: FxHashMap<String, PointerValue<'ink>>,
@@ -22,8 +23,6 @@ pub struct LlvmTypedIndex<'ink> {
     constants: FxHashMap<String, BasicValueEnum<'ink>>,
     utf08_literals: FxHashMap<String, GlobalValue<'ink>>,
     utf16_literals: FxHashMap<String, GlobalValue<'ink>>,
-    // TODO: Okay to have that field public?
-    pub got_layout: Option<HashMap<String, u64>>,
 }
 
 impl<'ink> LlvmTypedIndex<'ink> {
@@ -40,7 +39,6 @@ impl<'ink> LlvmTypedIndex<'ink> {
             constants: FxHashMap::default(),
             utf08_literals: FxHashMap::default(),
             utf16_literals: FxHashMap::default(),
-            got_layout: todo!("create child with proper GOT layout: {:?}", parent.got_layout),
         }
     }
 
@@ -59,6 +57,8 @@ impl<'ink> LlvmTypedIndex<'ink> {
         }
         for (name, index) in other.got_indices.drain() {
             self.got_indices.insert(name, index);
+
+            dbg!(&self.got_indices);
         }
         for (name, assocication) in other.initial_value_associations.drain() {
             self.initial_value_associations.insert(name, assocication);
@@ -72,8 +72,6 @@ impl<'ink> LlvmTypedIndex<'ink> {
         self.constants.extend(other.constants);
         self.utf08_literals.extend(other.utf08_literals);
         self.utf16_literals.extend(other.utf16_literals);
-
-        todo!("merge two got layouts together: {:?}", other.got_layout);
     }
 
     pub fn associate_type(
