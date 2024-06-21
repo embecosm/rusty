@@ -436,6 +436,9 @@ impl<T: SourceContainer + Sync> AnnotatedProject<T> {
                             literals,
                             &got_layout,
                         )?;
+
+                        dbg!(module.persist_to_string());
+
                         module
                             .persist(
                                 Some(&compile_directory),

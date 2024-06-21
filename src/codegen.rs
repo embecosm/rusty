@@ -151,10 +151,10 @@ impl<'ink> CodeGen<'ink> {
         let all_names = global_index
             .get_globals()
             .values()
-            .map(|g| g.get_qualified_name())
+            .map(VariableIndexEntry::get_qualified_name)
             .chain(program_globals)
             .chain(functions)
-            .map(|n| n.to_lowercase());
+            .map(str::to_lowercase);
 
         let all_names: Vec<_> = all_names.collect();
         dbg!(all_names.len());
@@ -192,6 +192,7 @@ impl<'ink> CodeGen<'ink> {
 
             // Construct our GOT as a new global array. We initialise this array in the loader code.
             let got_size = new_got.keys().max().map_or(0, |m| *m + 1);
+            eprintln!("creating __custom_got array");
             let _got = llvm.create_global_variable(
                 &self.module,
                 "__custom_got",
