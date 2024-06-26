@@ -32,6 +32,8 @@ use inkwell::{
     execution_engine::{ExecutionEngine, JitFunction},
     memory_buffer::MemoryBuffer,
     types::BasicType,
+    values::BasicValue,
+    AddressSpace,
 };
 use inkwell::{
     module::Module,
@@ -193,14 +195,24 @@ impl<'ink> CodeGen<'ink> {
             // Construct our GOT as a new global array. We initialise this array in the loader code.
             let got_size = new_got.keys().max().map_or(0, |m| *m + 1);
             eprintln!("creating __custom_got array");
-            let _got = llvm.create_global_variable(
-                &self.module,
-                "__custom_got",
-                BasicTypeEnum::ArrayType(Llvm::get_array_type(
-                    BasicTypeEnum::PointerType(llvm.context.i8_type().ptr_type(0.into())),
-                    got_size.try_into().expect("the computed custom GOT size is too large"),
-                )),
-            );
+
+            let custom_got_ty = BasicTypeEnum::ArrayType(Llvm::get_array_type(
+                BasicTypeEnum::PointerType(llvm.context.i8_type().ptr_type(0.into())),
+                got_size.try_into().expect("the computed custom GOT size is too large"),
+            ));
+
+            let ptr_ty = llvm.context.i8_type().ptr_type(AddressSpace::default());
+            let init = ptr_ty.const_array(vec![ptr_ty.const_null(); got_size.try_into().unwrap()].as_slice());
+
+            // let initial_value = unsafe {
+            //     inkwell::values::ArrayValue::new_const_array(
+            //         BasicTypeEnum::PointerType(llvm.context.i8_type().ptr_type(AddressSpace::default())),
+            //         vec![llvm.create_null_ptr().unwrap(); got_size.try_into().unwrap()].as_slice(),
+            //     )
+            // };
+
+            let custom_got = llvm.create_global_variable(&self.module, "__custom_got", custom_got_ty);
+            custom_got.set_initial_value(Some(init.as_basic_value_enum()), custom_got_ty);
 
             *got_entries = new_got_entries;
         }
