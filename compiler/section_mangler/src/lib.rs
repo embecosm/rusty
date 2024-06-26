@@ -72,10 +72,15 @@ pub const RUSTY_PREFIX: &str = "$RUSTY$";
 
 // TODO: How to encode variadics?
 fn mangle_function(FunctionMangler { name, parameters, return_type }: FunctionMangler) -> String {
-    let mangled = parameters
-        .into_iter()
-        /* FIXME: Is that correct? */
-        .fold(return_type.unwrap_or(Type::Void).to_string(), |mangled, arg| format!("{mangled}[{arg}]"));
+    /* FIXME: Is that correct? */
+    let return_type = return_type.unwrap_or(Type::Void);
+
+    let mangled = match parameters.as_slice() {
+        [] => format!("{return_type}[]"),
+        parameters => {
+            parameters.iter().fold(return_type.to_string(), |mangled, arg| format!("{mangled}[{arg}]"))
+        }
+    };
 
     format!("{name}:{mangled}")
 }
